@@ -185,7 +185,7 @@ public class MainActivity extends AppCompatActivity {
             }
         };
         tmr = new Timer();
-        tmr.schedule(TT,0,100);
+        tmr.schedule(TT,0,500);
     }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -233,17 +233,6 @@ public class MainActivity extends AppCompatActivity {
 
         //Telephony parts
         tm = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-        PhoneStateListener psl = new PhoneStateListener(){
-            @RequiresApi(api = Build.VERSION_CODES.Q)
-            @Override
-            public void onSignalStrengthsChanged(SignalStrength signalStrength) {
-                super.onSignalStrengthsChanged(signalStrength);
-                //RSRP (Reference Signal Received Power) - 단위 dBm (절대크기). - 단말에 수신되는 Reference Signal의 Power
-                String strSignal = signalStrength.toString();
-                CellSignalStrengthLte lteSig = (CellSignalStrengthLte)  signalStrength.getCellSignalStrengths().get(0);
-                rsrpNow = valueOf(lteSig.getRsrp());
-            }
-        };
         tm.listen(psl,PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
         //end of Telephony parts
 
@@ -275,4 +264,23 @@ public class MainActivity extends AppCompatActivity {
 
 
     }//end of onCreate
+
+    PhoneStateListener psl = new PhoneStateListener(){
+        @RequiresApi(api = Build.VERSION_CODES.Q)
+        @Override
+        public void onSignalStrengthsChanged(SignalStrength signalStrength) {
+            super.onSignalStrengthsChanged(signalStrength);
+            //RSRP (Reference Signal Received Power) - 단위 dBm (절대크기). - 단말에 수신되는 Reference Signal의 Power
+            String strSignal = signalStrength.toString();
+            Log.d("cellGPSv2","sigNow: "+strSignal);
+            CellSignalStrengthLte lteSig = (CellSignalStrengthLte)  signalStrength.getCellSignalStrengths().get(0);
+            rsrpNow = valueOf(lteSig.getRsrp());
+        }
+    };
+
+    @Override
+    protected void onDestroy(){
+        tm.listen(psl,PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+        super.onDestroy();
+    }
 }
