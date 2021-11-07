@@ -21,10 +21,15 @@ import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.telephony.CellIdentity;
+import android.telephony.CellIdentityLte;
+import android.telephony.CellInfo;
+import android.telephony.CellInfoLte;
 import android.telephony.CellSignalStrengthLte;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
+import android.telephony.gsm.GsmCellLocation;
 import android.util.Log;
 import android.view.View;
 import android.widget.ToggleButton;
@@ -33,6 +38,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -45,9 +51,13 @@ public class MainActivity extends AppCompatActivity {
     Timer tmr;
 
     //data
-    String rsrpNow="RSRP NOT MEASURED YET";
-    String altNow="ALTITUDE NOT MEASURED YET";
+    String rsrpNow = "RSRP NOT MEASURED YET";
+    String RSSINow = "RSSI NOT MEASURED YET";
+    String RSRQNow = "RSRQ NOT MEASURED YET";
+    String altNow = "ALTITUDE NOT MEASURED YET";
     String gpsNow = "GPS NOT MEASURED YET";
+    int cellID = 0;
+    //int LAC = 0;
 
     //managers
     LocationManager lm;
@@ -55,7 +65,9 @@ public class MainActivity extends AppCompatActivity {
     SensorManager sm;
     Sensor ps;
     SensorEventListener sel;
+    CellIdentityLte myCID;
 
+    //////////////////////////////PERMISSIONPARTS/////////////////////////////////////////////////////
 
     private void requestPermission() {
         boolean shouldProvideRationale =
@@ -73,10 +85,11 @@ public class MainActivity extends AppCompatActivity {
             makeDir();
         }
     }
+
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            String permissions[], int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode,permissions,grantResults);
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         switch (requestCode) {
             case PERMISSIONS_REQUEST_CODE: {
                 // If request is cancelled, the result arrays are empty.
@@ -94,27 +107,26 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void denialDialog(){
+    public void denialDialog() {
 
     }
 
-    public void makeDir(){
+    public void makeDir() {
         String root = Environment.getExternalStorageDirectory().getAbsolutePath();
         String directoryName = "cellGPSv2";
         final File myDir = new File(root + "/" + directoryName);
-        Log.d("cellGPSv2",root);
-        if(!myDir.exists()){
+        Log.d("cellGPSv2", root);
+        if (!myDir.exists()) {
             boolean wasSuccessful = myDir.mkdir();
-            Log.d("cellGPSv2","notexitsts");
+            Log.d("cellGPSv2", "notexitsts");
             if (!wasSuccessful) {
                 System.out.println("file: was not successful.");
-                Log.d("cellGPSv2","this2");
+                Log.d("cellGPSv2", "this2");
             } else {
                 System.out.println("file: first create files." + root + "/" + directoryName);
             }
-        }
-        else {
-            System.out.println("file: " + root + "/" + directoryName +"already exists");
+        } else {
+            System.out.println("file: " + root + "/" + directoryName + "already exists");
         }
         whereDir = root + "/" + directoryName;
         long now = System.currentTimeMillis(); //TODO 현재시간 받아오기
@@ -123,21 +135,23 @@ public class MainActivity extends AppCompatActivity {
         String nowTime = sdf.format(date);
         String textFileName = "cellGPSv2 " + nowTime + ".txt";
         thisFile = textFileName;
-        File file = new File(myDir+textFileName);
-        Log.d("cellGPSv2","this3");
-        try{
-            if(!file.exists()){
+        File file = new File(myDir + textFileName);
+        Log.d("cellGPSv2", "this3");
+        try {
+            if (!file.exists()) {
                 file.createNewFile();
-                Log.d("cellGPSv2","madein");
+                Log.d("cellGPSv2", "madein");
             }
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
     private static String[] PERMISSIONS_STORAGE = {
             Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.WRITE_EXTERNAL_STORAGE
     };
+
     public void verifyStoragePermissions(Activity activity) {
         // Check if we have write permission
         int permission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -157,11 +171,15 @@ public class MainActivity extends AppCompatActivity {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    public void mySaveText(){
-        try{
+    public void updateCellIds() {
+        cellID = myCID.getCi();
+    }
+
+    public void mySaveText() {
+        try {
             verifyStoragePermissions(this);
-            File fileReal = new File(whereDir+"/"+thisFile);
-            writer = new FileWriter(fileReal,true);
+            File fileReal = new File(whereDir + "/" + thisFile);
+            writer = new FileWriter(fileReal, true);
 
             long now2 = System.currentTimeMillis(); //TODO 현재시간 받아오기
             Date date2 = new Date(now2); //TODO Date 객체 생성
@@ -169,24 +187,28 @@ public class MainActivity extends AppCompatActivity {
             String nowTime2 = sdf.format(date2);
 
             writer.write("[" + nowTime2 + "]\nRSRP: [" + rsrpNow + "]\nAltitude: [" + altNow + "]\n" + gpsNow + "\n");
+            writer.write("CellID: [" + cellID + "]\n");
+            writer.write("Strength(RSSI): [" + RSSINow + "]\nQuality(RSRQ): [" + RSRQNow + "]\n");
             writer.write("\n");
             writer.flush();
             writer.close();
-        }
-        catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
-    public void tempTask(){
+
+    public void tempTask() {
         TimerTask TT = new TimerTask() {
             @Override
             public void run() {
+                updateCellIds();
                 mySaveText();
             }
         };
         tmr = new Timer();
-        tmr.schedule(TT,0,500);
+        tmr.schedule(TT, 0, 500);
     }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -194,22 +216,21 @@ public class MainActivity extends AppCompatActivity {
 
         //ToggleButton parts
         tb = (ToggleButton) findViewById(R.id.ssBtn);
-        Log.d("cellGPSv2","thiscreate");
+        Log.d("cellGPSv2", "thiscreate");
 
         tb.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                try{
-                    Log.d("cellGPSv2","click");
-                    if(tb.isChecked()){
-                        Log.d("cellGPSv2","on");
+                try {
+                    Log.d("cellGPSv2", "click");
+                    if (tb.isChecked()) {
+                        Log.d("cellGPSv2", "on");
                         requestPermission();
                         tempTask();
-                    }
-                    else{
+                    } else {
                         tmr.cancel();
                     }
-                }catch(SecurityException ex){
+                } catch (SecurityException ex) {
                 }
             }
         });//end of toggle button onClickListener
@@ -221,19 +242,38 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSensorChanged(SensorEvent event) {
                 float sval = event.values[0];
-                altNow = valueOf(sm.getAltitude(sm.PRESSURE_STANDARD_ATMOSPHERE,sval));
+                altNow = valueOf(sm.getAltitude(sm.PRESSURE_STANDARD_ATMOSPHERE, sval));
             }
+
             @Override
             public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
             }
         };
-        sm.registerListener(sel,ps,sm.SENSOR_DELAY_UI);
+        sm.registerListener(sel, ps, sm.SENSOR_DELAY_UI);
         //end of sensor parts
 
         //Telephony parts
         tm = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-        tm.listen(psl,PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+        tm.listen(psl, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        List<CellInfo> cells = tm.getAllCellInfo();
+        if(cells!=null){
+            for(CellInfo info : cells){
+                if (info instanceof CellInfoLte){
+                    myCID = (((CellInfoLte) info).getCellIdentity());
+                }
+            }
+        }
         //end of Telephony parts
 
 
@@ -275,6 +315,8 @@ public class MainActivity extends AppCompatActivity {
             Log.d("cellGPSv2","sigNow: "+strSignal);
             CellSignalStrengthLte lteSig = (CellSignalStrengthLte)  signalStrength.getCellSignalStrengths().get(0);
             rsrpNow = valueOf(lteSig.getRsrp());
+            RSSINow = valueOf(lteSig.getRssi());
+            RSRQNow = valueOf(lteSig.getRsrq());
         }
     };
 
