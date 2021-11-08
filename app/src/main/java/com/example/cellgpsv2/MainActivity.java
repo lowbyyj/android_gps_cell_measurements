@@ -32,6 +32,7 @@ import android.telephony.TelephonyManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.util.Log;
 import android.view.View;
+import android.widget.TextView;
 import android.widget.ToggleButton;
 
 import java.io.File;
@@ -48,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
     String whereDir;
     String thisFile;
     ToggleButton tb;
+    TextView tvDebug;
     Timer tmr;
 
     //data
@@ -173,6 +175,8 @@ public class MainActivity extends AppCompatActivity {
 
     public void updateCellIds() {
         cellID = myCID.getCi();
+
+        Log.d("cellGPSv2", "updateCellIds: "+cellID);
     }
 
     public void mySaveText() {
@@ -201,6 +205,8 @@ public class MainActivity extends AppCompatActivity {
         TimerTask TT = new TimerTask() {
             @Override
             public void run() {
+                //debug here
+                tvDebug.setText(altNow);
                 updateCellIds();
                 mySaveText();
             }
@@ -213,6 +219,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        //TextView part
+        tvDebug = (TextView)findViewById(R.id.debugText);
+        //end of text view part
 
         //ToggleButton parts
         tb = (ToggleButton) findViewById(R.id.ssBtn);
@@ -301,6 +311,8 @@ public class MainActivity extends AppCompatActivity {
                     ls);
         } catch(SecurityException ex){
         }
+        //end of GPS part
+
 
 
     }//end of onCreate

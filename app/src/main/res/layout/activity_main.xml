@@ -17,4 +17,15 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/debugText"
+        android:layout_width="271dp"
+        android:layout_height="58dp"
+        android:gravity="center"
+        android:text="For debugging data"
+        app:layout_constraintBottom_toTopOf="@+id/ssBtn"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 </androidx.constraintlayout.widget.ConstraintLayout>
