@@ -68,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
     Sensor ps;
     SensorEventListener sel;
     CellIdentityLte myCID;
+    Context inThis;
 
     //////////////////////////////PERMISSIONPARTS/////////////////////////////////////////////////////
 
@@ -175,7 +176,6 @@ public class MainActivity extends AppCompatActivity {
 
     public void updateCellIds() {
         cellID = myCID.getCi();
-
         Log.d("cellGPSv2", "updateCellIds: "+cellID);
     }
 
@@ -205,8 +205,19 @@ public class MainActivity extends AppCompatActivity {
         TimerTask TT = new TimerTask() {
             @Override
             public void run() {
+                if (ActivityCompat.checkSelfPermission(inThis, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    return;
+                }
+                List<CellInfo> cells = tm.getAllCellInfo();
+                if(cells!=null){
+                    for(CellInfo info : cells){
+                        if (info instanceof CellInfoLte){
+                            myCID = (((CellInfoLte) info).getCellIdentity());
+                        }
+                    }
+                }
                 //debug here
-                tvDebug.setText(altNow);
+                tvDebug.setText(valueOf(cellID));
                 updateCellIds();
                 mySaveText();
             }
@@ -219,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        inThis = this;
         //TextView part
         tvDebug = (TextView)findViewById(R.id.debugText);
         //end of text view part
