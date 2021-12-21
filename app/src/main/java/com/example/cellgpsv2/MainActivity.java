@@ -51,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
     ToggleButton tb;
     TextView tvDebug;
     Timer tmr;
+    String debugBuilder;
 
     //data
     String rsrpNow = "RSRP NOT MEASURED YET";
@@ -58,7 +59,10 @@ public class MainActivity extends AppCompatActivity {
     String RSRQNow = "RSRQ NOT MEASURED YET";
     String altNow = "ALTITUDE NOT MEASURED YET";
     String gpsNow = "GPS NOT MEASURED YET";
+    String CQINow = "CQI NOT MEASURED YET";
     int cellID = 0;
+    int nzCellID = 0;
+    int maxCellCounter = 0;
     //int LAC = 0;
 
     //managers
@@ -191,8 +195,8 @@ public class MainActivity extends AppCompatActivity {
             String nowTime2 = sdf.format(date2);
 
             writer.write("[" + nowTime2 + "]\nRSRP: [" + rsrpNow + "]\nAltitude: [" + altNow + "]\n" + gpsNow + "\n");
-            writer.write("CellID: [" + cellID + "]\n");
-            writer.write("Strength(RSSI): [" + RSSINow + "]\nQuality(RSRQ): [" + RSRQNow + "]\n");
+            writer.write("CellID: [" + nzCellID + "]\n");
+            writer.write("Strength(RSSI): [" + RSSINow + "]\nQuality(RSRQ): [" + RSRQNow + "]\nIndicator(CQI): [" + CQINow + "]\n");
             writer.write("\n");
             writer.flush();
             writer.close();
@@ -205,6 +209,8 @@ public class MainActivity extends AppCompatActivity {
         TimerTask TT = new TimerTask() {
             @Override
             public void run() {
+                int tempCellCounter = 0;
+                debugBuilder = "";
                 if (ActivityCompat.checkSelfPermission(inThis, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     return;
                 }
@@ -213,11 +219,19 @@ public class MainActivity extends AppCompatActivity {
                     for(CellInfo info : cells){
                         if (info instanceof CellInfoLte){
                             myCID = (((CellInfoLte) info).getCellIdentity());
+                            if(myCID.getCi()!=0){
+                                nzCellID = myCID.getCi();
+                            }
+                            tempCellCounter++;
+                            if(tempCellCounter>maxCellCounter){
+                                maxCellCounter = tempCellCounter;
+                            }
+                            debugBuilder = debugBuilder + valueOf(tempCellCounter) + "-th ECI(Cell ID) : " + valueOf(myCID.getCi()) + "\n";
                         }
                     }
                 }
                 //debug here
-                tvDebug.setText(valueOf(cellID));
+                tvDebug.setText(debugBuilder);
                 updateCellIds();
                 mySaveText();
             }
@@ -291,7 +305,7 @@ public class MainActivity extends AppCompatActivity {
         if(cells!=null){
             for(CellInfo info : cells){
                 if (info instanceof CellInfoLte){
-                    myCID = (((CellInfoLte) info).getCellIdentity());
+//                    myCID = (((CellInfoLte) info).getCellIdentity());
                 }
             }
         }
@@ -340,6 +354,7 @@ public class MainActivity extends AppCompatActivity {
             rsrpNow = valueOf(lteSig.getRsrp());
             RSSINow = valueOf(lteSig.getRssi());
             RSRQNow = valueOf(lteSig.getRsrq());
+            CQINow = valueOf(lteSig.getCqi());
         }
     };
 
