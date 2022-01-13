@@ -20,8 +20,8 @@
 
     <TextView
         android:id="@+id/debugText"
-        android:layout_width="271dp"
-        android:layout_height="58dp"
+        android:layout_width="265dp"
+        android:layout_height="221dp"
         android:gravity="center"
         android:text="For debugging data"
         app:layout_constraintBottom_toTopOf="@+id/ssBtn"

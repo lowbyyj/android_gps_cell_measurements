@@ -296,7 +296,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSensorChanged(SensorEvent event) {
                 float sval = event.values[0];
-                altNow = valueOf(sm.getAltitude(sm.PRESSURE_STANDARD_ATMOSPHERE, sval));
+                altitudeCarrier = sm.getAltitude(sm.PRESSURE_STANDARD_ATMOSPHERE, sval);
+                altNow = valueOf(altitudeCarrier);
             }
 
             @Override
@@ -339,7 +340,6 @@ public class MainActivity extends AppCompatActivity {
                 double longitude = location.getLongitude();
                 double latitude = location.getLatitude();
                 double altitude = location.getAltitude();
-                altitudeCarrier = altitude;
                 float accuracy = location.getAccuracy();
                 String provider = location.getProvider();
                 gpsNow = "GPS위치정보: [" + provider + "]\n위도: [" + latitude + "]\n경도: [" + longitude + "]\nmgps고도: [" + altitude + "]\n정확도: ["  + accuracy + "]";
