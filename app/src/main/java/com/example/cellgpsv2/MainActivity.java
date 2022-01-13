@@ -63,6 +63,9 @@ public class MainActivity extends AppCompatActivity {
     int cellID = 0;
     int nzCellID = 0;
     int maxCellCounter = 0;
+    double altitudeCarrier = 0;
+    double startingAltitude = 0;
+    boolean isFileRecordFlag = false;
     //int LAC = 0;
 
     //managers
@@ -209,31 +212,46 @@ public class MainActivity extends AppCompatActivity {
         TimerTask TT = new TimerTask() {
             @Override
             public void run() {
-                int tempCellCounter = 0;
-                debugBuilder = "";
-                if (ActivityCompat.checkSelfPermission(inThis, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                    return;
+                if(altitudeCarrier>startingAltitude+10 && !isFileRecordFlag) {
+                    requestPermission();
+                    isFileRecordFlag = true;
+                    //debugBuilder = "Record started, starting Altitude: " + valueOf(startingAltitude) + " m";
+                    //tvDebug.setText(debugBuilder);
                 }
-                List<CellInfo> cells = tm.getAllCellInfo();
-                if(cells!=null){
-                    for(CellInfo info : cells){
-                        if (info instanceof CellInfoLte){
-                            myCID = (((CellInfoLte) info).getCellIdentity());
-                            if(myCID.getCi()!=0){
-                                nzCellID = myCID.getCi();
+                if(isFileRecordFlag && altitudeCarrier<startingAltitude+9){
+                    isFileRecordFlag = false;
+                    debugBuilder = "Record just stopped\nStarting Altitude was: " + valueOf(startingAltitude) + " m\nAltitude Carrier value is: " +valueOf(altitudeCarrier) + " m";
+                    tvDebug.setText(debugBuilder);
+                }
+                if (isFileRecordFlag) {
+                    int tempCellCounter = 0;
+                    //debugBuilder = "";
+                    if (ActivityCompat.checkSelfPermission(inThis, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                        return;
+                    }
+                    List<CellInfo> cells = tm.getAllCellInfo();
+                    if(cells!=null){
+                        for(CellInfo info : cells){
+                            if (info instanceof CellInfoLte){
+                                myCID = (((CellInfoLte) info).getCellIdentity());
+                                if(myCID.getCi()!=0){
+                                    nzCellID = myCID.getCi();
+                                }
+                                tempCellCounter++;
+                                if(tempCellCounter>maxCellCounter){
+                                    maxCellCounter = tempCellCounter;
+                                }
+                                //debugBuilder = debugBuilder + valueOf(tempCellCounter) + "-th ECI(Cell ID) : " + valueOf(myCID.getCi()) + "\n";
                             }
-                            tempCellCounter++;
-                            if(tempCellCounter>maxCellCounter){
-                                maxCellCounter = tempCellCounter;
-                            }
-                            debugBuilder = debugBuilder + valueOf(tempCellCounter) + "-th ECI(Cell ID) : " + valueOf(myCID.getCi()) + "\n";
                         }
                     }
+                    //debug here
+                    debugBuilder = "Now recording\nStarting Altitude was: " + valueOf(startingAltitude) + " m\nAltitude Carrier value is: " +valueOf(altitudeCarrier) + " m";
+                    tvDebug.setText(debugBuilder);
+                    //end of debug
+                    updateCellIds();
+                    mySaveText();
                 }
-                //debug here
-                tvDebug.setText(debugBuilder);
-                updateCellIds();
-                mySaveText();
             }
         };
         tmr = new Timer();
@@ -256,11 +274,12 @@ public class MainActivity extends AppCompatActivity {
         tb.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                isFileRecordFlag = false;
+                startingAltitude = altitudeCarrier;
                 try {
                     Log.d("cellGPSv2", "click");
                     if (tb.isChecked()) {
                         Log.d("cellGPSv2", "on");
-                        requestPermission();
                         tempTask();
                     } else {
                         tmr.cancel();
@@ -320,6 +339,7 @@ public class MainActivity extends AppCompatActivity {
                 double longitude = location.getLongitude();
                 double latitude = location.getLatitude();
                 double altitude = location.getAltitude();
+                altitudeCarrier = altitude;
                 float accuracy = location.getAccuracy();
                 String provider = location.getProvider();
                 gpsNow = "GPS위치정보: [" + provider + "]\n위도: [" + latitude + "]\n경도: [" + longitude + "]\nmgps고도: [" + altitude + "]\n정확도: ["  + accuracy + "]";
