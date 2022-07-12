@@ -1,5 +1,8 @@
 package com.example.cellgpsv2;
 
+import static android.telephony.CellInfo.UNAVAILABLE_LONG;
+import static android.telephony.TelephonyManager.NETWORK_TYPE_LTE;
+import static android.telephony.TelephonyManager.NETWORK_TYPE_NR;
 import static java.lang.String.valueOf;
 
 import androidx.annotation.NonNull;
@@ -10,6 +13,7 @@ import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -21,11 +25,15 @@ import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.Settings;
 import android.telephony.CellIdentity;
 import android.telephony.CellIdentityLte;
+import android.telephony.CellIdentityNr;
 import android.telephony.CellInfo;
 import android.telephony.CellInfoLte;
+import android.telephony.CellInfoNr;
 import android.telephony.CellSignalStrengthLte;
+import android.telephony.CellSignalStrengthNr;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
 import android.telephony.TelephonyManager;
@@ -38,6 +46,7 @@ import android.widget.ToggleButton;
 import java.io.File;
 import java.io.FileWriter;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Timer;
@@ -53,6 +62,10 @@ public class MainActivity extends AppCompatActivity {
     Timer tmr;
     String debugBuilder;
 
+    //testEnvironmentsConfigure
+    double MeasurementStartAltitudeThreshold = 1;
+    double MeasurementStopAltitudeThreshold = 0.9;
+
     //data
     String rsrpNow = "RSRP NOT MEASURED YET";
     String RSSINow = "RSSI NOT MEASURED YET";
@@ -60,13 +73,18 @@ public class MainActivity extends AppCompatActivity {
     String altNow = "ALTITUDE NOT MEASURED YET";
     String gpsNow = "GPS NOT MEASURED YET";
     String CQINow = "CQI NOT MEASURED YET";
+    String CQITableIdx = "CQI Table Idx NA";
+    String CsiSinr = "CSI SINR NA";
     int cellID = 0;
     int nzCellID = 0;
+    long nrCellID = 0;
     int maxCellCounter = 0;
     double altitudeCarrier = 0;
     double startingAltitude = 0;
     boolean isFileRecordFlag = false;
     //int LAC = 0;
+    int LTE_NR_flag = 0;
+    //0:lte, 1:NR
 
     //managers
     LocationManager lm;
@@ -75,7 +93,11 @@ public class MainActivity extends AppCompatActivity {
     Sensor ps;
     SensorEventListener sel;
     CellIdentityLte myCID;
+    CellIdentityNr myCIDnr;
     Context inThis;
+
+    //additionalDebugParameters
+    Boolean debugBool1 = false;
 
     //////////////////////////////PERMISSIONPARTS/////////////////////////////////////////////////////
 
@@ -143,16 +165,25 @@ public class MainActivity extends AppCompatActivity {
         Date date = new Date(now); //TODO Date 객체 생성
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd kk:mm:ss");
         String nowTime = sdf.format(date);
+        nowTime = nowTime.replaceAll(":",".");
         String textFileName = "cellGPSv2 " + nowTime + ".txt";
         thisFile = textFileName;
         File file = new File(myDir + textFileName);
         Log.d("cellGPSv2", "this3");
         try {
-            if (!file.exists()) {
-                file.createNewFile();
-                Log.d("cellGPSv2", "madein");
+            if (Build.VERSION.SDK_INT >= 30) {
+                if (!Environment.isExternalStorageManager()) {
+                    Intent getpermission = new Intent();
+                    getpermission.setAction(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                    startActivity(getpermission);
+                    if (!file.exists()) {
+                        file.createNewFile();
+                        Log.d("cellGPSv2", "madein");
+                    }
+                }
             }
-        } catch (Exception e) {
+        }
+        catch (Exception e){
             e.printStackTrace();
         }
     }
@@ -175,6 +206,29 @@ public class MainActivity extends AppCompatActivity {
             );
         }
     }
+    private void repetitiveMyCheckPermissionsWork1(){
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+        }
+//        switch (tm.getDataNetworkType()) {
+//            case NETWORK_TYPE_NR:
+//                Log.d("cellGPSv2", "NETWORK_TYPE_NR");
+//                tvDebug.setText("NETWORK_TYPE_NR");
+//                break;
+//            case NETWORK_TYPE_LTE:
+//                Log.d("cellGPSv2", "NETWORK_TYPE_LTE");
+//                tvDebug.setText("NETWORK_TYPE_LTE");
+//                break;
+//            default:
+//                Log.d("cellGPSv2", "UNKNOWN_NETWORK_TYPE");
+//        }
+    }
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -182,8 +236,16 @@ public class MainActivity extends AppCompatActivity {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     public void updateCellIds() {
-        cellID = myCID.getCi();
-        Log.d("cellGPSv2", "updateCellIds: "+cellID);
+        if(myCID.getCi()!=0) {
+            cellID = myCID.getCi();
+        }
+        if(myCIDnr!=null){
+            if(myCIDnr.getNci()!=UNAVAILABLE_LONG){
+                nrCellID = myCIDnr.getNci();
+            }
+        }
+
+//        Log.d("cellGPSv2", "updateCellIds: "+cellID);
     }
 
     public void mySaveText() {
@@ -197,9 +259,19 @@ public class MainActivity extends AppCompatActivity {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd kk:mm:ss");
             String nowTime2 = sdf.format(date2);
 
-            writer.write("[" + nowTime2 + "]\nRSRP: [" + rsrpNow + "]\nAltitude: [" + altNow + "]\n" + gpsNow + "\n");
+            writer.write("[" + nowTime2 + "]\n");
+            if(LTE_NR_flag == 0){
+                writer.write("5G/LTE Signal Indicator = LTE\n");
+            }
+            else if(LTE_NR_flag==1){
+                writer.write("5G/LTE Signal Indicator = NR\n");
+            }
+            writer.write("RSRP: [" + rsrpNow + "]\nAltitude: [" + altNow + "]\n" + gpsNow + "\n");
             writer.write("CellID: [" + nzCellID + "]\n");
             writer.write("Strength(RSSI): [" + RSSINow + "]\nQuality(RSRQ): [" + RSRQNow + "]\nIndicator(CQI): [" + CQINow + "]\n");
+            if (LTE_NR_flag == 1) {
+                writer.write("NRcqiTableIndex: [" + CQITableIdx + "]\n");
+            }
             writer.write("\n");
             writer.flush();
             writer.close();
@@ -210,18 +282,25 @@ public class MainActivity extends AppCompatActivity {
 
     public void tempTask() {
         TimerTask TT = new TimerTask() {
+            @RequiresApi(api = Build.VERSION_CODES.Q)
             @Override
             public void run() {
-                if(altitudeCarrier>startingAltitude+10 && !isFileRecordFlag) {
+                Log.d("cellGPSv2", "run is working now, mNrValid:" + debugBool1);
+                //repetitiveMyCheckPermissionsWork1();
+
+
+                if(altitudeCarrier>startingAltitude+MeasurementStartAltitudeThreshold && !isFileRecordFlag) {
                     requestPermission();
                     isFileRecordFlag = true;
                     //debugBuilder = "Record started, starting Altitude: " + valueOf(startingAltitude) + " m";
                     //tvDebug.setText(debugBuilder);
+                    Log.d("cellGPSv2", "isFileRecordFlag = true");
                 }
-                if(isFileRecordFlag && altitudeCarrier<startingAltitude+9){
+                if(isFileRecordFlag && altitudeCarrier<startingAltitude+MeasurementStopAltitudeThreshold){
                     isFileRecordFlag = false;
-                    debugBuilder = "Record just stopped\nStarting Altitude was: " + valueOf(startingAltitude) + " m\nAltitude Carrier value is: " +valueOf(altitudeCarrier) + " m";
+//                    debugBuilder = "Record just stopped\nStarting Altitude was: " + valueOf(startingAltitude) + " m\nAltitude Carrier value is: " +valueOf(altitudeCarrier) + " m";
                     tvDebug.setText(debugBuilder);
+                    Log.d("cellGPSv2", "isFileRecordFlag = false");
                 }
                 if (isFileRecordFlag) {
                     int tempCellCounter = 0;
@@ -243,15 +322,32 @@ public class MainActivity extends AppCompatActivity {
                                 }
                                 //debugBuilder = debugBuilder + valueOf(tempCellCounter) + "-th ECI(Cell ID) : " + valueOf(myCID.getCi()) + "\n";
                             }
+                            else if (info instanceof CellInfoNr){
+                                myCIDnr = (CellIdentityNr) (((CellInfoNr) info).getCellIdentity());
+                                if(myCIDnr.getNci()!=0){
+                                    nrCellID = myCIDnr.getNci();
+                                }
+                                tempCellCounter++;
+                                if(tempCellCounter>maxCellCounter){
+                                    maxCellCounter = tempCellCounter;
+                                }
+                            }
                         }
                     }
                     //debug here
-                    debugBuilder = "Now recording\nStarting Altitude was: " + valueOf(startingAltitude) + " m\nAltitude Carrier value is: " +valueOf(altitudeCarrier) + " m";
+                    //debugBuilder = "Now recording\nStarting Altitude was: " + valueOf(startingAltitude) + " m\nAltitude Carrier value is: " +valueOf(altitudeCarrier) + " m\n";
+                    if(debugBool1){
+                        //debugBuilder+="NETWORK_TYPE_NR";
+                    }
+                    else{
+                        //debugBuilder+="NETWORK_TYPE_LTE";
+                    }
                     tvDebug.setText(debugBuilder);
                     //end of debug
                     updateCellIds();
                     mySaveText();
                 }
+                tvDebug.setText(debugBuilder);
             }
         };
         tmr = new Timer();
@@ -298,6 +394,7 @@ public class MainActivity extends AppCompatActivity {
                 float sval = event.values[0];
                 altitudeCarrier = sm.getAltitude(sm.PRESSURE_STANDARD_ATMOSPHERE, sval);
                 altNow = valueOf(altitudeCarrier);
+//                Log.d("cellGPSv2","altNow:" + altNow);
             }
 
             @Override
@@ -310,7 +407,7 @@ public class MainActivity extends AppCompatActivity {
 
         //Telephony parts
         tm = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-        tm.listen(psl, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
+//        tm.registerTelephonyCallback();
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             // TODO: Consider calling
             //    ActivityCompat#requestPermissions
@@ -329,6 +426,41 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+        PhoneStateListener psl = new PhoneStateListener(){
+            @RequiresApi(api = Build.VERSION_CODES.Q)
+            @Override
+            public void onSignalStrengthsChanged(SignalStrength signalStrength) {
+                super.onSignalStrengthsChanged(signalStrength);
+                //RSRP (Reference Signal Received Power) - 단위 dBm (절대크기). - 단말에 수신되는 Reference Signal의 Power
+                String strSignal = signalStrength.toString();
+                debugBuilder = strSignal;
+                debugBool1 = !strSignal.contains("mNr=Invalid");
+                if(debugBool1){
+                    LTE_NR_flag = 1;
+                }
+                else{
+                    LTE_NR_flag = 0;
+                }
+                Log.d("cellGPSv2","LTE_NR_flag: " + LTE_NR_flag + ", sigNow: "+signalStrength.getCellSignalStrengths().toString());
+                if (LTE_NR_flag==0) {
+                    CellSignalStrengthLte lteSig = (CellSignalStrengthLte) signalStrength.getCellSignalStrengths().get(0);
+                    rsrpNow = valueOf(lteSig.getRsrp());
+                    RSSINow = valueOf(lteSig.getRssi());
+                    RSRQNow = valueOf(lteSig.getRsrq());
+                    CQINow = valueOf(lteSig.getCqi());
+                }
+                else if (LTE_NR_flag==1){
+                    debugBuilder = signalStrength.getCellSignalStrengths().toString();
+//                    CellSignalStrengthNr nrSig = (CellSignalStrengthNr) signalStrength.getCellSignalStrengths().get(0);
+//                    rsrpNow = valueOf(nrSig.getCsiRsrp());
+//                    RSRQNow = valueOf(nrSig.getCsiRsrq());
+//                    CQINow = valueOf(nrSig.getCsiCqiReport().get(0));
+//                    CQITableIdx = valueOf(nrSig.getCsiCqiTableIndex());
+//                    CsiSinr = valueOf(nrSig.getCsiSinr());
+                }
+            }
+        };
+        tm.listen(psl, PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
         //end of Telephony parts
 
 
@@ -362,25 +494,11 @@ public class MainActivity extends AppCompatActivity {
 
     }//end of onCreate
 
-    PhoneStateListener psl = new PhoneStateListener(){
-        @RequiresApi(api = Build.VERSION_CODES.Q)
-        @Override
-        public void onSignalStrengthsChanged(SignalStrength signalStrength) {
-            super.onSignalStrengthsChanged(signalStrength);
-            //RSRP (Reference Signal Received Power) - 단위 dBm (절대크기). - 단말에 수신되는 Reference Signal의 Power
-            String strSignal = signalStrength.toString();
-            Log.d("cellGPSv2","sigNow: "+strSignal);
-            CellSignalStrengthLte lteSig = (CellSignalStrengthLte)  signalStrength.getCellSignalStrengths().get(0);
-            rsrpNow = valueOf(lteSig.getRsrp());
-            RSSINow = valueOf(lteSig.getRssi());
-            RSRQNow = valueOf(lteSig.getRsrq());
-            CQINow = valueOf(lteSig.getCqi());
-        }
-    };
+
 
     @Override
     protected void onDestroy(){
-        tm.listen(psl,PhoneStateListener.LISTEN_SIGNAL_STRENGTHS);
         super.onDestroy();
     }
 }
+
