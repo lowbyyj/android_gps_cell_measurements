@@ -9,6 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import android.Manifest;
 import android.app.Activity;
@@ -36,6 +37,7 @@ import android.telephony.CellSignalStrengthLte;
 import android.telephony.CellSignalStrengthNr;
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
+import android.telephony.TelephonyCallback;
 import android.telephony.TelephonyManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.util.Log;
@@ -49,10 +51,31 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import javax.security.auth.callback.Callback;
+
+
+
+
 public class MainActivity extends AppCompatActivity {
+
+//    @RequiresApi(Build.VERSION_CODES.S)
+//    class CustomTelephonyCallback extends TelephonyCallback implements TelephonyCallback.SignalStrengthsListener{
+//
+//        private Callback mCallback;
+//
+//        public CustomTelephonyCallback(Callback callback){
+//            mCallback = callback;
+//        }
+//        public void onSignalStrengthsChanged(SignalStrength signalStrength){
+//            mCallback.SignalStrengthChanged()
+//        }
+//
+//    }
+
     FileWriter writer;
     final int PERMISSIONS_REQUEST_CODE = 1;
     String whereDir;
@@ -98,6 +121,13 @@ public class MainActivity extends AppCompatActivity {
 
     //additionalDebugParameters
     Boolean debugBool1 = false;
+
+    ///for Telephony Classes////////////////
+
+//    interface Callback{
+//        void onSignalStrengthChanged(SignalStrength signalStrength);
+//    }
+
 
     //////////////////////////////PERMISSIONPARTS/////////////////////////////////////////////////////
 
@@ -288,7 +318,6 @@ public class MainActivity extends AppCompatActivity {
                 Log.d("cellGPSv2", "run is working now, mNrValid:" + debugBool1);
                 //repetitiveMyCheckPermissionsWork1();
 
-
                 if(altitudeCarrier>startingAltitude+MeasurementStartAltitudeThreshold && !isFileRecordFlag) {
                     requestPermission();
                     isFileRecordFlag = true;
@@ -299,7 +328,7 @@ public class MainActivity extends AppCompatActivity {
                 if(isFileRecordFlag && altitudeCarrier<startingAltitude+MeasurementStopAltitudeThreshold){
                     isFileRecordFlag = false;
 //                    debugBuilder = "Record just stopped\nStarting Altitude was: " + valueOf(startingAltitude) + " m\nAltitude Carrier value is: " +valueOf(altitudeCarrier) + " m";
-                    tvDebug.setText(debugBuilder);
+                    //tvDebug.setText(debugBuilder);
                     Log.d("cellGPSv2", "isFileRecordFlag = false");
                 }
                 if (isFileRecordFlag) {
@@ -342,17 +371,18 @@ public class MainActivity extends AppCompatActivity {
                     else{
                         //debugBuilder+="NETWORK_TYPE_LTE";
                     }
-                    tvDebug.setText(debugBuilder);
+                    //tvDebug.setText(debugBuilder);
                     //end of debug
                     updateCellIds();
                     mySaveText();
                 }
-                tvDebug.setText(debugBuilder);
+                //tvDebug.setText(debugBuilder);
             }
         };
         tmr = new Timer();
         tmr.schedule(TT, 0, 500);
     }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -407,17 +437,10 @@ public class MainActivity extends AppCompatActivity {
 
         //Telephony parts
         tm = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-//        tm.registerTelephonyCallback();
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            // TODO: Consider calling
-            //    ActivityCompat#requestPermissions
-            // here to request the missing permissions, and then overriding
-            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-            //                                          int[] grantResults)
-            // to handle the case where the user grants the permission. See the documentation
-            // for ActivityCompat#requestPermissions for more details.
             return;
         }
+
         List<CellInfo> cells = tm.getAllCellInfo();
         if(cells!=null){
             for(CellInfo info : cells){
@@ -426,6 +449,15 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+
+//        telephony.registerTelephonyCallback(context.getMainExecutor(), new CustomTelephonyCallback(new CallBack() {
+//            @Override
+//            public void callStateChanged(int state) {
+//
+//                int myState=state;
+//
+//            }
+//        }));
         PhoneStateListener psl = new PhoneStateListener(){
             @RequiresApi(api = Build.VERSION_CODES.Q)
             @Override
@@ -433,8 +465,8 @@ public class MainActivity extends AppCompatActivity {
                 super.onSignalStrengthsChanged(signalStrength);
                 //RSRP (Reference Signal Received Power) - 단위 dBm (절대크기). - 단말에 수신되는 Reference Signal의 Power
                 String strSignal = signalStrength.toString();
-                debugBuilder = strSignal;
-                debugBool1 = !strSignal.contains("mNr=Invalid");
+                //debugBuilder = strSignal;
+                debugBool1 = !(strSignal.contains("mNr=Invalid")||strSignal.contains("csiRsrp = 2147483647"));
                 if(debugBool1){
                     LTE_NR_flag = 1;
                 }
@@ -448,9 +480,15 @@ public class MainActivity extends AppCompatActivity {
                     RSSINow = valueOf(lteSig.getRssi());
                     RSRQNow = valueOf(lteSig.getRsrq());
                     CQINow = valueOf(lteSig.getCqi());
+                    tvDebug.setText("LTE");
                 }
                 else if (LTE_NR_flag==1){
-                    debugBuilder = signalStrength.getCellSignalStrengths().toString();
+                    for (int i = 0; i < signalStrength.getCellSignalStrengths().size(); i++){
+                        if(signalStrength.getCellSignalStrengths().get(i).getClass().getName()=="android.telephony.CellSignalStrengthNr"){
+                            debugBuilder = "success!";
+                            tvDebug.setText(debugBuilder);
+                        }
+                    }
 //                    CellSignalStrengthNr nrSig = (CellSignalStrengthNr) signalStrength.getCellSignalStrengths().get(0);
 //                    rsrpNow = valueOf(nrSig.getCsiRsrp());
 //                    RSRQNow = valueOf(nrSig.getCsiRsrq());
